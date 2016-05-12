@@ -1,5 +1,9 @@
 import { describeWithDOM, describeIf } from './_helpers';
-import React from 'react';
+import React, { Component } from 'react';
+import {
+  unstable_renderSubtreeIntoContainer,
+  unmountComponentAtNode,
+} from 'react-dom';
 import { expect } from 'chai';
 import {
   mount,
@@ -425,6 +429,72 @@ describeWithDOM('mount', () => {
       expect(() => wrapper.find({})).to.throw(Error);
       expect(() => wrapper.find([])).to.throw(Error);
       expect(() => wrapper.find(null)).to.throw(Error);
+    });
+
+    describe('renderSubtreeIntoContainer()', () => {
+      it('finds components in subtree', () => {
+        // This component is a simplified version of https://github.com/callemall/material-ui/blob/a76c0889055fbc7cc854b391f915cd477f3687a8/src/internal/RenderToLayer.js
+        class ComponentWithSubtree extends Component {
+          componentDidMount() {
+            this.renderLayer();
+          }
+
+          componentDidUpdate() {
+            this.renderLayer();
+          }
+
+          componentWillUnmount() {
+            this.unrenderLayer();
+          }
+
+          getLayer() {
+            return this.layer;
+          }
+
+          unrenderLayer() {
+            if (!this.layer) {
+              return;
+            }
+
+            unmountComponentAtNode(this.layer);
+            document.body.removeChild(this.layer);
+            this.layer = null;
+          }
+
+          renderLayer() {
+            if (!this.layer) {
+              this.layer = document.createElement('div');
+              document.body.appendChild(this.layer);
+            }
+
+            const layerElement = this.renderSubtree();
+
+            if (layerElement === null) {
+              this.layerElement = unstable_renderSubtreeIntoContainer(
+                this, null, this.layer);
+            } else {
+              this.layerElement = unstable_renderSubtreeIntoContainer(
+                this, layerElement, this.layer);
+            }
+          }
+
+          renderSubtree() {
+            return (
+              <div>{'foo'}</div>
+            );
+          }
+
+          render() {
+            return null;
+          }
+        }
+
+        const wrapper = mount(
+          <ComponentWithSubtree />
+        );
+
+        expect(wrapper.find('div')).to.have.length(1);
+      });
     });
   });
 
